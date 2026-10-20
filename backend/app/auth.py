@@ -67,7 +67,11 @@ async def create_login(
 
 @router.get("/providers", response_model=ProvidersResponse)
 async def providers(settings: SettingsDep) -> ProvidersResponse:
-    return ProvidersResponse(local=True, oidc=settings.oidc_enabled)
+    return ProvidersResponse(
+        local=True,
+        registration_enabled=settings.local_registration_enabled,
+        oidc=settings.oidc_enabled,
+    )
 
 
 @router.post("/register", response_model=TokenResponse, status_code=201)
@@ -79,6 +83,8 @@ async def register(
     settings: SettingsDep,
 ) -> TokenResponse:
     check_origin(request, settings)
+    if not settings.local_registration_enabled:
+        raise HTTPException(403, detail="registration_disabled")
     user = User(
         email=str(body.email).casefold(),
         password_hash=await run_in_threadpool(password_hasher.hash, body.password),

@@ -1,11 +1,12 @@
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     JSON,
     Boolean,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
@@ -97,3 +98,36 @@ Index(
     postgresql_using="hnsw",
     postgresql_ops={"embedding": "vector_cosine_ops"},
 ).ddl_if(dialect="postgresql")
+
+
+class TrackedRequest(Base):
+    __tablename__ = "tracked_requests"
+    __table_args__ = (
+        CheckConstraint("status IN ('open', 'completed')", name="ck_tracked_requests_status"),
+        CheckConstraint(
+            "(status = 'open' AND completed_at IS NULL) OR "
+            "(status = 'completed' AND completed_at IS NOT NULL)",
+            name="ck_tracked_requests_completion",
+        ),
+        CheckConstraint("length(trim(title)) > 0", name="ck_tracked_requests_title"),
+        CheckConstraint("length(trim(owner)) > 0", name="ck_tracked_requests_owner"),
+        UniqueConstraint(
+            "user_id", "submission_key", name="uq_tracked_requests_user_submission_key"
+        ),
+        Index("ix_tracked_requests_user_status_due", "user_id", "status", "due_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    submission_key: Mapped[str] = mapped_column(String(36))
+    title: Mapped[str] = mapped_column(String(160))
+    details: Mapped[str] = mapped_column(Text)
+    owner: Mapped[str] = mapped_column(String(160))
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    status: Mapped[Literal["open", "completed"]] = mapped_column(String(16), default="open")
+    response: Mapped[str | None] = mapped_column(Text)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )

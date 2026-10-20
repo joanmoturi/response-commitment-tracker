@@ -14,7 +14,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 from starlette.middleware.sessions import SessionMiddleware
 
-from app import agent, auth, documents
+from app import agent, auth, commitments, documents
 from app.config import Settings, get_settings
 from app.db import create_session_factory
 
@@ -123,13 +123,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 ):
                     # Only the explicit local SQLite launcher bypasses Alembic.
                     revision = await session.scalar(text("SELECT version_num FROM alembic_version"))
-                    if revision != "0001":
+                    if revision != "0002":
                         raise RuntimeError("database schema revision mismatch")
                 await session.execute(text("SELECT 1 FROM users LIMIT 1"))
         except Exception as exc:
             raise HTTPException(503, detail="database_not_ready") from exc
         return {"status": "ready"}
 
-    for router in [auth.router, agent.router, documents.router]:
+    for router in [auth.router, agent.router, documents.router, commitments.router]:
         app.include_router(router, prefix="/api/v1")
     return app

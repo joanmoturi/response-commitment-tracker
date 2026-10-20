@@ -29,3 +29,6 @@ def test_postgres_migration_renders_extension_and_vector() -> None:
     assert "USING hnsw" in result.stdout
     assert "refresh_tokens" in result.stdout
     assert "agent_runs" in result.stdout
+    assert "tracked_requests" in result.stdout
+    assert "ck_tracked_requests_completion" in result.stdout
+    assert "uq_tracked_requests_user_submission_key" in result.stdout

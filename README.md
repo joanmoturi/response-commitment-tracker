@@ -1,8 +1,22 @@
-# ai-agent-boilerplate
+# Response Commitment Tracker
 
-A modular AI-agent boilerplate and fullstack starter built on FastAPI / Next.js,
-with local and optional OIDC authentication,
-PostgreSQL + pgvector, and schema-validated OpenAI agent orchestration.
+An authenticated pilot MVP for small B2B service coordinators to track response
+requests, owner names, deadlines, and completion. Requests are private to the
+signed-in account; assigned owners are free-form names or contacts, not shared
+application users. Team workspaces and customer validation are not yet included.
+
+The repository retains the existing FastAPI / Next.js foundation, including its
+agent and vector-document endpoints. Those inherited capabilities are not part
+of the selected tracker workflow.
+
+This project is maintained separately as `joanmoturi/response-commitment-tracker`;
+the original `ai-agent-boilerplate` repository is not its publishing destination.
+
+**Current status:** private-account pilot implementation is present, but the
+October 19 release audit is **NO-GO for production or real customer data**.
+Customer demand is unvalidated, an unpatched high-severity development-tool
+dependency advisory remains, and production controls/recovery are unverified.
+See `docs/security-review.md` and `docs/deployment.md`.
 
 ## Quick start (PowerShell)
 
@@ -11,17 +25,18 @@ PostgreSQL + pgvector, and schema-validated OpenAI agent orchestration.
 Run each command in a separate PowerShell window and leave both windows open:
 
 ```powershell
-Set-Location C:\Users\joanmoturi\ai-fullstack-starter\backend
+Set-Location .\backend
 # First-time dependency setup: uv sync --frozen --extra dev
 .\.venv\Scripts\python.exe -m scripts.dev_server
 ```
 
 ```powershell
-Set-Location C:\Users\joanmoturi\ai-fullstack-starter\frontend
+Set-Location .\frontend
 # First-time dependency setup: npm ci
 npm run dev
 ```
 
+Run those commands from the repository root in separate PowerShell windows.
 Visit `http://localhost:3000` (use `localhost`, not `127.0.0.1`, for browser
 authentication). The development launcher creates an ignored `.local` directory
 containing the persistent SQLite database and a stable randomly generated JWT
@@ -104,6 +119,12 @@ via the Next proxy or ingress. Set `FRONTEND_URL`, `CORS_ORIGINS`, and the OIDC
 redirect URI to that origin. Do not link local and OIDC accounts merely because
 their email addresses match.
 
+`LOCAL_REGISTRATION_ENABLED` defaults to `true` for local development. Production
+configuration must explicitly set it to `false`; startup fails closed otherwise.
+Existing local-password users can still sign in, and OIDC provisioning remains
+available when configured. If public self-registration is required, design and
+review that policy separately rather than exposing this local endpoint.
+
 ## API contract
 
 All application routes are under `/api/v1`.
@@ -115,11 +136,16 @@ All application routes are under `/api/v1`.
 | `POST /auth/refresh` | Rotate cookie; return access token and user |
 | `POST /auth/logout` | Revoke refresh session and clear cookie |
 | `GET /auth/me` | Bearer-authenticated current user |
-| `GET /auth/providers` | Available local / OIDC login options |
+| `GET /auth/providers` | Available local / OIDC login and registration options |
 | `GET /auth/oidc/login` | Start configured OIDC authorization flow |
 | `GET /auth/oidc/callback` | Validate callback and establish application session |
 | `POST /agent/runs` | `{prompt}`; execute bounded agent and persist result |
 | `GET /agent/runs/{id}` | Read a run belonging to the current user |
+| `POST /requests` | Create a private response request with an idempotency key |
+| `GET /requests` | List own requests; filter by status/search and paginate |
+| `GET /requests/{id}` | Read own request; other accounts receive 404 |
+| `PATCH /requests/{id}` | Update details, owner, or deadline while open |
+| `POST /requests/{id}/complete` | Complete once and optionally record a response |
 | `GET /health/live` | Process liveness (outside `/api/v1`) |
 | `GET /health/ready` | Database readiness (outside `/api/v1`) |
 
@@ -218,3 +244,47 @@ Before exposing it publicly:
 
 Use the committed frontend lockfile for reproducible installs. Backend dependency
 and database integration instructions are documented alongside the backend.
+
+## AI engineering sprint workspace
+
+This repository also holds the reusable engineering assets and outcome records
+for a 30-day AI-assisted software engineering sprint. Application code stays in
+`frontend` and `backend`; the sprint assets do not create another application.
+The selected flagship is a private-account response-tracker pilot; customer
+validation remains incomplete.
+
+| Location | Use |
+| --- | --- |
+| `prompts` | Existing reusable prompt collection; preserve the saved files |
+| `docs/product-spec.md` | Selected pilot scope, assumptions, and acceptance criteria |
+| `docs/architecture.md` | Workspace organization and documented application foundation |
+| `docs/security-review.md` | Scoped feature review and remaining production gates |
+| `docs/implementation-plan.md` | Setup, discovery, implementation, and demo gates |
+| `SPRINT.md` | Proposed 30-day sequence, daily outcomes, and status |
+| `CREDIT-LOG.md` | Manual authorization, usage evidence, and outcomes |
+| `.github/copilot-instructions.md` | Persistent repository guidance for Copilot |
+
+Start Copilot from this repository directory, not the home directory:
+
+```powershell
+# From the repository root
+copilot
+```
+
+The CLI discovers recognized repository instruction files; a directory named
+`prompts` is not automatically loaded. Use `/instructions` to inspect instruction
+discovery. User-wide instructions can also apply, so repository guidance alone
+does not isolate this workspace from global customization.
+
+Select a saved prompt explicitly for a task, for example: "Read
+`prompts/01-product-discovery.md` and use it to guide discovery only; do not modify
+files." The saved collection also includes `00-operating-rules.md`,
+`02-architect.md`, `03-implementer.md`, `04-reviewer.md`, and `05-release.md`.
+Task instructions and tool permissions still determine what actions are allowed.
+
+Use the existing verification commands and CI before adding shared scripts.
+There is intentionally no root `scripts` directory until a concrete, working
+helper is needed. The user confirmed repository ownership and authorized a private
+GitHub upload on October 20, 2026. Real-data permission and spending authorization
+remain unconfirmed; do not copy employer-confidential material into this workspace
+or treat the private upload as permission to publish publicly, spend, or deploy.

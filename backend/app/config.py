@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     environment: Literal["development", "test", "production"] = "development"
     frontend_url: str = "http://localhost:3000"
     cors_origins: list[str] = ["http://localhost:3000"]
+    local_registration_enabled: bool = True
     cookie_secure: bool = False
     access_token_minutes: int = Field(default=10, ge=1, le=30)
     refresh_token_days: int = Field(default=14, ge=1, le=90)
@@ -53,6 +54,8 @@ class Settings(BaseSettings):
         if self.oidc_issuer and urlparse(self.oidc_issuer).scheme != "https":
             raise ValueError("OIDC issuer must use HTTPS")
         if self.environment == "production":
+            if self.local_registration_enabled:
+                raise ValueError("Production requires LOCAL_REGISTRATION_ENABLED=false")
             if not self.cookie_secure:
                 raise ValueError("Production requires COOKIE_SECURE=true")
             if any(

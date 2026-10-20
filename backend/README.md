@@ -12,7 +12,7 @@ Copy-Item .env.example .env
 # Generate JWT_SECRET and set it in .env; configure PostgreSQL.
 .\.venv\Scripts\python.exe -c "import secrets; print(secrets.token_urlsafe(48))"
 .\.venv\Scripts\alembic.exe upgrade head
-.\.venv\Scripts\uvicorn.exe app.main:create_app --factory --host 0.0.0.0 --port 8000 --no-access-log
+.\.venv\Scripts\uvicorn.exe app.main:create_app --factory --host 127.0.0.1 --port 8000 --no-access-log
 ```
 
 Reproducible alternative (uv 0.11.30): `uv sync --frozen --extra dev`.
@@ -31,6 +31,19 @@ Docker build from this directory: `docker build -t ai-starter-backend .`.
 
 Prefix `/api/v1`. Swagger `/docs`; schema `/openapi.json`.
 
+The response tracker adds authenticated `POST /requests`, `GET /requests`,
+`GET /requests/{id}`, `PATCH /requests/{id}`, and
+`POST /requests/{id}/complete` routes. List status filters are `open` (default),
+`overdue`, `completed`, or `all`, with optional `q`, `limit` (1–100), and
+`offset`. Deadlines must include a timezone and are normalized to UTC. Overdue
+means an open request whose deadline is strictly before now. Requests are
+isolated by authenticated account; `owner` is a name/contact string, not an
+account membership or permission grant. Migration `0002` adds the feature;
+deploy with `alembic upgrade head` before starting the API.
+Create requests include a client-generated `submission_key` UUID. Reusing the
+same key within one account returns the original request, so clients can safely
+retry an uncertain create response.
+
 | Method/path | Request | Successful response |
 |---|---|---|
 | POST `/auth/register` | `{email,password}` (12–128 char password) | 201 token response |
@@ -38,7 +51,7 @@ Prefix `/api/v1`. Swagger `/docs`; schema `/openapi.json`.
 | POST `/auth/refresh` | empty body | 200 token response |
 | POST `/auth/logout` | empty body | 204 |
 | GET `/auth/me` | bearer authorization | `{id,email}` |
-| GET `/auth/providers` | none | `{local:true,oidc:boolean}` |
+| GET `/auth/providers` | none | `{local:true,registration_enabled:boolean,oidc:boolean}` |
 | GET `/auth/oidc/login` | browser navigation | IdP redirect, or 503 if disabled |
 | GET `/auth/oidc/callback` | IdP authorization response | 303 to FRONTEND_URL, no token in URL |
 | POST `/agent/runs` | bearer, `{prompt}` | 201 `{id,status,answer,error,steps}` |
@@ -78,6 +91,9 @@ local/external identities. Account linking must be a separate authenticated flow
 `OPENAI_MODEL=gpt-4o-mini`. `ENVIRONMENT=development|test|production`.
 `FRONTEND_URL=http://localhost:3000`, `CORS_ORIGINS` is a JSON list of explicit origins.
 `COOKIE_SECURE=false` locally; production enforces secure cookies and HTTPS browser URLs.
+`LOCAL_REGISTRATION_ENABLED=true` locally; production requires it to be `false`.
+This disables public local account creation while preserving local sign-in and
+configured OIDC provisioning.
 OIDC requires all of `OIDC_ISSUER` (HTTPS), `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, and
 registered `OIDC_REDIRECT_URI` (default frontend-proxied callback on :3000). Blank OIDC values disable it.
 The frontend must proxy `/api/v1/*` to the backend without dropping Cookie/Set-Cookie headers.

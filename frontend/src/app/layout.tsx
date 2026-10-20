@@ -3,8 +3,8 @@ import { AuthProvider } from "@/features/auth/auth-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AI Fullstack Starter",
-  description: "A modular workspace for schema-validated AI agents."
+  title: "Response Tracker",
+  description: "Track response owners, deadlines, and completion."
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

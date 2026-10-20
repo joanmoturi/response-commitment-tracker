@@ -13,3 +13,9 @@ node_modules/
 coverage/
 *.tsbuildinfo
 .local/
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*

@@ -13,7 +13,11 @@ export function AuthForm() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [providers, setProviders] = useState<{ local: boolean; oidc: boolean } | null>(null);
+  const [providers, setProviders] = useState<{
+    local: boolean;
+    registration_enabled: boolean;
+    oidc: boolean;
+  } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -46,9 +50,11 @@ export function AuthForm() {
         <label className="block">Email<input className="input mt-1" type="email" autoComplete="email" required maxLength={320} value={email} onChange={(event) => setEmail(event.target.value)} /></label>
         <label className="block">Password<input className="input mt-1" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} required minLength={mode === "register" ? 12 : 1} maxLength={128} value={password} onChange={(event) => setPassword(event.target.value)} /></label>
         <button className="button w-full" disabled={busy}>{busy ? "Working..." : mode === "login" ? "Sign in" : "Register"}</button>
-        <button type="button" disabled={busy} className="text-sm text-sky-300 underline" onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(null); }}>
-          {mode === "login" ? "Create an account instead" : "Already registered? Sign in"}
-        </button>
+        {providers.registration_enabled && (
+          <button type="button" disabled={busy} className="text-sm text-sky-300 underline" onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(null); }}>
+            {mode === "login" ? "Create an account instead" : "Already registered? Sign in"}
+          </button>
+        )}
       </form>}
       {providers?.oidc && <a className="button mt-4 block text-center" href="/api/v1/auth/oidc/login">Continue with your identity provider</a>}
       {!providers && !error && <p className="mt-4 text-slate-400">Loading providers...</p>}

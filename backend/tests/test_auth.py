@@ -7,7 +7,7 @@ import pytest
 from fastapi import FastAPI
 from sqlalchemy import select
 
-from app.config import Settings
+from app.config import Settings, get_settings
 from app.models import RefreshFamily, RefreshToken, User, utcnow
 from app.security import token_hash
 from tests.conftest import ORIGIN, PASSWORD, authorization, csrf, register
@@ -134,6 +134,30 @@ async def test_duplicate_login_failure_and_no_input_echo(client: httpx.AsyncClie
     assert response.status_code == 422
 
 
+async def test_local_registration_can_be_disabled(
+    client: httpx.AsyncClient, application: FastAPI
+) -> None:
+    settings = Settings(
+        _env_file=None,
+        jwt_secret="test-only-secret-that-is-at-least-32-characters",
+        database_url="sqlite+aiosqlite://",
+        environment="test",
+        local_registration_enabled=False,
+    )
+    application.dependency_overrides[get_settings] = lambda: settings
+
+    providers = await client.get("/api/v1/auth/providers")
+    assert providers.status_code == 200
+    assert providers.json() == {"local": True, "registration_enabled": False, "oidc": False}
+    response = await client.post(
+        "/api/v1/auth/register",
+        headers={"Origin": ORIGIN},
+        json={"email": "private@example.com", "password": PASSWORD},
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == "registration_disabled"
+
+
 async def test_rotation_reuse_revokes_family(client: httpx.AsyncClient) -> None:
     await register(client)
     old = client.cookies["refresh_token"]
@@ -207,7 +231,11 @@ async def test_jwt_validation(client: httpx.AsyncClient, settings: Settings) -> 
 
 
 async def test_provider_and_health(client: httpx.AsyncClient) -> None:
-    assert (await client.get("/api/v1/auth/providers")).json() == {"local": True, "oidc": False}
+    assert (await client.get("/api/v1/auth/providers")).json() == {
+        "local": True,
+        "registration_enabled": True,
+        "oidc": False,
+    }
     assert (await client.get("/api/v1/auth/oidc/login")).status_code == 503
     assert (await client.get("/api/v1/auth/oidc/callback")).status_code == 503
     assert (await client.get("/health/live")).json() == {"status": "ok"}
@@ -235,3 +263,19 @@ def test_settings_security() -> None:
         with pytest.raises(ValueError):
             Settings(**(base | override))
     assert Settings(**base, openai_api_key="", oidc_issuer="").openai_api_key is None
+
+
+def test_production_requires_local_registration_disabled() -> None:
+    secure_production = {
+        "_env_file": None,
+        "jwt_secret": "production-only-secret-that-is-at-least-32-characters",
+        "environment": "production",
+        "frontend_url": "https://app.example.com",
+        "cors_origins": ["https://app.example.com"],
+        "cookie_secure": True,
+        "oidc_redirect_uri": "https://app.example.com/api/v1/auth/oidc/callback",
+    }
+    with pytest.raises(ValueError, match="LOCAL_REGISTRATION_ENABLED=false"):
+        Settings(**secure_production)
+    settings = Settings(**secure_production, local_registration_enabled=False)
+    assert settings.environment == "production"
